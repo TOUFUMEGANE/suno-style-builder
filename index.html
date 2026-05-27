@@ -1,0 +1,1443 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Suno Style Builder</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+JP:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --surface2: #1c1c26;
+    --border: #2a2a3a;
+    --accent: #ff3c6e;
+    --accent2: #00e5ff;
+    --accent3: #ffd600;
+    --text: #e8e8f0;
+    --text-dim: #6b6b80;
+    --high: #00e676;
+    --mid: #00b0ff;
+    --low: #ff9100;
+    --tag-bg: #1e1e2e;
+    --tag-selected: rgba(255,60,110,0.15);
+    --radius: 6px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* 背景グリッド */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,60,110,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,60,110,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 16px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ヘッダー */
+  header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    text-shadow: 0 0 20px rgba(255,60,110,0.4);
+  }
+
+  .logo-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  /* ===== エリア① プロンプト出力 ===== */
+  .output-area {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 16px;
+    position: relative;
+  }
+
+  .output-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--accent2);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .output-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: var(--text);
+    min-height: 48px;
+    line-height: 1.7;
+    word-break: break-all;
+    letter-spacing: 0.3px;
+  }
+
+  .output-text.empty {
+    color: var(--text-dim);
+    font-style: italic;
+    font-size: 13px;
+    font-family: 'Noto Sans JP', sans-serif;
+  }
+
+  /* 文字数バー */
+  .char-bar-wrap {
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .char-bar-bg {
+    flex: 1;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .char-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--accent2);
+    transition: width 0.3s ease, background 0.3s ease;
+    width: 0%;
+  }
+
+  .char-bar-fill.warn { background: var(--low); }
+  .char-bar-fill.over { background: var(--accent); }
+
+  .char-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+    white-space: nowrap;
+    min-width: 56px;
+    text-align: right;
+  }
+
+  .char-count.warn { color: var(--low); }
+  .char-count.over { color: var(--accent); }
+
+  /* コピーボタン */
+  .copy-btn {
+    width: 100%;
+    margin-top: 12px;
+    padding: 12px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: var(--radius);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 16px;
+    letter-spacing: 3px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .copy-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: white;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .copy-btn:active::before { opacity: 0.15; }
+  .copy-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(255,60,110,0.4); }
+  .copy-btn:disabled { background: var(--border); color: var(--text-dim); cursor: default; transform: none; box-shadow: none; }
+
+  .copy-btn.copied { background: var(--high); }
+
+  /* ===== エリア② 単語選択パネル ===== */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+
+  /* 検索 */
+  .search-wrap {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .search-icon {
+    color: var(--text-dim);
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .search-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+  }
+
+  .search-input::placeholder { color: var(--text-dim); font-size: 12px; font-family: 'Noto Sans JP', sans-serif; }
+
+  /* タブ */
+  .tabs {
+    display: flex;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--border);
+    scrollbar-width: none;
+  }
+
+  .tabs::-webkit-scrollbar { display: none; }
+
+  .tab {
+    padding: 10px 16px;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    cursor: pointer;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    background: transparent;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+  }
+
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* 単語グリッド */
+  .words-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 8px;
+    padding: 14px;
+    max-height: 320px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .word-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 9px 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    text-align: left;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .word-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--accent);
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .word-btn:active::after { opacity: 0.1; }
+
+  .word-btn:hover {
+    border-color: var(--text-dim);
+    transform: translateY(-1px);
+  }
+
+  .word-btn.selected {
+    background: var(--tag-selected);
+    border-color: var(--accent);
+  }
+
+  .word-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .word-jp {
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+
+  /* 打率バッジ */
+  .rate-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.5px;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-weight: 600;
+  }
+
+  .rate-high { background: rgba(0,230,118,0.12); color: var(--high); }
+  .rate-mid  { background: rgba(0,176,255,0.12); color: var(--mid); }
+  .rate-low  { background: rgba(255,145,0,0.12);  color: var(--low); }
+
+  .rate-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .rate-high .rate-dot { background: var(--high); }
+  .rate-mid  .rate-dot { background: var(--mid); }
+  .rate-low  .rate-dot { background: var(--low); }
+
+  /* 検索結果なし */
+  .no-results {
+    grid-column: 1/-1;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 13px;
+    padding: 24px;
+  }
+
+  /* ===== エリア③ 選択済みタグ ===== */
+  .selected-area {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    margin-bottom: 16px;
+  }
+
+  .selected-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--accent3);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .selected-count {
+    background: var(--accent3);
+    color: var(--bg);
+    border-radius: 10px;
+    font-size: 9px;
+    padding: 1px 7px;
+    font-weight: 700;
+  }
+
+  .tags-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    min-height: 32px;
+    align-items: flex-start;
+  }
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--tag-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 5px 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text);
+    animation: tagIn 0.15s ease;
+  }
+
+  @keyframes tagIn {
+    from { opacity: 0; transform: scale(0.85); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  .tag-remove {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    transition: color 0.15s;
+  }
+
+  .tag-remove:hover { color: var(--accent); }
+
+  .tags-empty {
+    color: var(--text-dim);
+    font-size: 12px;
+    font-style: italic;
+  }
+
+  .clear-all-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: 'Noto Sans JP', sans-serif;
+    transition: all 0.15s;
+    margin-left: auto;
+  }
+
+  .clear-all-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .selected-label-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  /* トースト通知 */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(60px);
+    background: var(--high);
+    color: var(--bg);
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    z-index: 100;
+    pointer-events: none;
+    letter-spacing: 1px;
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* おすすめセット */
+  .suggest-area {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+
+  .suggest-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: #c084fc;
+    letter-spacing: 2px;
+    padding: 12px 14px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .suggest-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .suggest-scroll {
+    display: flex;
+    gap: 10px;
+    padding: 10px 14px 14px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .suggest-scroll::-webkit-scrollbar { display: none; }
+
+  .suggest-card {
+    flex-shrink: 0;
+    width: 200px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 11px 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: left;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .suggest-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, #c084fc, #818cf8);
+  }
+
+  .suggest-card:hover {
+    border-color: #c084fc;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(192,132,252,0.15);
+  }
+
+  .suggest-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 3px;
+    font-family: 'Noto Sans JP', sans-serif;
+  }
+
+  .suggest-artist {
+    font-size: 10px;
+    color: #c084fc;
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 8px;
+    letter-spacing: 0.5px;
+  }
+
+  .suggest-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+
+  .suggest-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    background: rgba(129,140,248,0.1);
+    color: #818cf8;
+    border: 1px solid rgba(129,140,248,0.25);
+    border-radius: 3px;
+    padding: 2px 5px;
+  }
+
+  .suggest-apply-btn {
+    width: 100%;
+    padding: 6px;
+    background: rgba(192,132,252,0.15);
+    border: 1px solid rgba(192,132,252,0.3);
+    border-radius: 4px;
+    color: #c084fc;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .suggest-apply-btn:hover { background: rgba(192,132,252,0.3); }
+
+  .suggest-none {
+    color: var(--text-dim);
+    font-size: 12px;
+    padding: 12px 14px;
+    font-style: italic;
+  }
+
+  /* 検索エリア内のモード切替 */
+  .search-mode-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .search-mode-tab {
+    flex: 1;
+    padding: 8px;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+
+  .search-mode-tab.active { color: #c084fc; border-bottom-color: #c084fc; }
+
+  /* レスポンシブ */
+  @media (max-width: 400px) {
+    .words-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+    .logo { font-size: 22px; }
+    .suggest-card { width: 175px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="logo">SUNO STYLE BUILDER</div>
+    <div class="logo-sub">[ ROCK &amp; JAZZ EDITION ]</div>
+
+  </header>
+
+  <!-- エリア① 出力 -->
+  <div class="output-area">
+    <div class="output-label">▸ STYLE PROMPT OUTPUT</div>
+    <div class="output-text empty" id="outputText">単語をタップして選んでください...</div>
+    <div class="char-bar-wrap">
+      <div class="char-bar-bg">
+        <div class="char-bar-fill" id="charBarFill"></div>
+      </div>
+      <div class="char-count" id="charCount">0 / 120</div>
+    </div>
+    <button class="copy-btn" id="copyBtn" disabled onclick="copyPrompt()">📋 ワンタップでコピー</button>
+  </div>
+
+  <!-- エリア③ 選択済みタグ（上に配置） -->
+  <div class="selected-area">
+    <div class="selected-label-row">
+      <div class="selected-label">
+        ▸ SELECTED
+        <span class="selected-count" id="selectedCount">0</span>
+      </div>
+      <button class="clear-all-btn" id="clearAllBtn" onclick="clearAll()">すべてクリア</button>
+    </div>
+    <div class="tags-wrap" id="tagsWrap">
+      <span class="tags-empty" id="tagsEmpty">まだ何も選択されていません</span>
+    </div>
+  </div>
+
+  <!-- おすすめセットエリア -->
+  <div class="suggest-area" id="suggestArea">
+    <div class="suggest-label">✦ IMAGE SEARCH — おすすめセット</div>
+    <div class="suggest-scroll" id="suggestScroll">
+      <div class="suggest-none">下の検索ボックスで日本語のイメージやアーティスト名を入力してください</div>
+    </div>
+  </div>
+
+  <!-- エリア② 単語選択 -->
+  <div class="panel">
+    <div class="search-mode-tabs">
+      <button class="search-mode-tab active" id="modeWordBtn" onclick="setSearchMode('word')">🔤 単語検索</button>
+      <button class="search-mode-tab" id="modeImageBtn" onclick="setSearchMode('image')">🎨 イメージ検索</button>
+    </div>
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input class="search-input" type="text" id="searchInput"
+        placeholder="キーワードで検索（例：bass、dark、female...）"
+        oninput="onSearchInput()">
+    </div>
+    <div class="tabs" id="tabs"></div>
+    <div class="words-grid" id="wordsGrid"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast">✓ コピーしました！</div>
+
+<script>
+// =============================================
+//  単語データベース（ガチ強化版）
+// =============================================
+const CATEGORIES = [
+  {
+    id: 'genre',
+    label: 'GENRE / ジャンル',
+    words: [
+      { en: 'modern heavy metal', jp: 'モダンヘヴィメタル', rate: 'high' },
+      { en: 'metalcore',        jp: 'メタルコア（激・疾走）', rate: 'high' },
+      { en: 'melodic speed metal', jp: 'メロスピ（超疾走）', rate: 'high' },
+      { en: 'j-rock',           jp: '王道J-ロック（アニソン風）', rate: 'high' },
+      { en: 'alternative rock', jp: 'オルタナティブ・ロック', rate: 'high' },
+      { en: '90s grunge',       jp: '90年代グランジ（ザラつき）', rate: 'high' },
+      { en: 'pop punk',         jp: 'ポップパンク（爽快・疾走）', rate: 'high' },
+      { en: 'post-hardcore',    jp: 'ポストハードコア',    rate: 'mid'  },
+      { en: 'math rock',        jp: 'マスロック（複雑・変則）', rate: 'mid'  },
+      { en: 'jazz fusion',      jp: 'ジャズ・フュージョン', rate: 'high' },
+      { en: 'acid jazz',        jp: 'アシッドジャズ（お洒落）', rate: 'high' },
+      { en: 'modern funk',      jp: 'モダン・ファンク',    rate: 'high' },
+      { en: 'city pop',         jp: 'シティポップ（都会的）', rate: 'high' },
+      { en: '90s j-pop',        jp: '90年代王道J-POP',    rate: 'high' },
+      { en: 'vocaloid style',   jp: 'ボカロ楽曲風（高速系）', rate: 'high' },
+      { en: 'electro swing',    jp: 'エレクトロ・スウィング', rate: 'high' },
+      { en: 'cyberpunk synthwave', jp: 'サイバーパンク・シンセ', rate: 'high' },
+      { en: 'electro metalcore', jp: 'ピコリーモ（激しさとエレクトロの融合）', rate: 'high' },
+      { en: 'nu-metal',         jp: 'ミクスチャー（00年代ラウド重厚感）', rate: 'high' },
+      { en: 'reggae punk',      jp: 'レゲエパンク（SiM風の跳ねる重低音）', rate: 'high' },
+      { en: 'gothic dark pop',  jp: 'ゴシック・ダークポップ（ホラー・狂気）', rate: 'high' },
+      { en: 'japanese jazz fusion', jp: '和風ジャズフュージョン（超絶技巧）', rate: 'high' },
+      { en: 'shibuya-kei',      jp: '渋谷系（お洒落アコースティック・ジャズ）', rate: 'mid'  },
+      { en: 'shoegaze',         jp: 'シューゲイザー（ノイズの壁・エモ）', rate: 'mid'  }
+    ]
+  },
+  {
+    id: 'bass_guitar',
+    label: '🎸 BASS (こだわり奏法)',
+    words: [
+      { en: 'slap bass aggressive', jp: '攻撃的スラップベース', rate: 'high' },
+      { en: 'prominent walking bass', jp: '目立つウォーキングベース', rate: 'high' },
+      { en: 'funk slap bassline',  jp: 'ファンキーなスラップ',   rate: 'high' },
+      { en: 'heavy picked bass',   jp: '激しいピック弾きベース', rate: 'high' },
+      { en: 'fretless bass groove',jp: 'フレットレス（うねる系）', rate: 'mid'  },
+      { en: 'distorted bass',      jp: '歪み歪んだベース',      rate: 'high' },
+      { en: 'driving bassline',    jp: '疾走感を出すベースライン', rate: 'high' },
+      { en: 'groovy synth bass',   jp: '極太シンセベース',      rate: 'high' },
+      { en: 'sub bass boost',      jp: '重低音サブベース強調',  rate: 'mid'  },
+      { en: 'overdriven picking bass', jp: 'ゴリゴリのドライブを効かせたピック弾き', rate: 'high' },
+      { en: 'funk slap breakdown',    jp: 'ベースが主役になるブレイクダウン展開', rate: 'high' },
+      { en: 'complex jazz bassline',  jp: '手数が多くウネウネ動くジャズベース', rate: 'high' }
+    ]
+  },
+  {
+    id: 'guitar_drums',
+    label: '🥁 GUITAR / DRUMS',
+    words: [
+      { en: 'heavy chugging guitar',jp: 'メタル特有の刻みギター', rate: 'high' },
+      { en: 'screaming guitar solo',jp: '泣きの激しいギターソロ', rate: 'high' },
+      { en: 'fast double bass drum',jp: '激しいツーバス連打',    rate: 'high' },
+      { en: 'blast beat',          jp: '極限の爆速ドラム連打',   rate: 'high' },
+      { en: 'driving shuffle beat', jp: '跳ねるシャッフルビート', rate: 'high' },
+      { en: 'technical drumming',   jp: '手数の多い複雑なドラム', rate: 'mid'  },
+      { en: 'clean arpeggio guitar',jp: '綺麗なアルペジオギター', rate: 'high' },
+      { en: 'funky muted guitar strum', jp: 'ファンクの弾むカッティング', rate: 'high' },
+      { en: 'melodic twin guitar solos', jp: 'ハモる美しいツインギターソロ', rate: 'high' }
+    ]
+  },
+  {
+    id: 'vocal_style',
+    label: '🎤 VOCAL (質感・特徴)',
+    words: [
+      { en: 'androgynous vocal',   jp: '中性的なボーカル',    rate: 'high' },
+      { en: 'emotional female vocal', jp: '感情豊かな女性ボーカル', rate: 'high' },
+      { en: 'powerful male vocal',  jp: '力強い男性ボーカル',    rate: 'high' },
+      { en: 'husky raspy vocal',   jp: 'ハスキー・かすれ声',    rate: 'high' },
+      { en: 'melodic hardcore vocals', jp: 'メロコア風の掛け合い', rate: 'mid'  },
+      { en: 'vocaloid inflection', jp: 'ボカロ独特の歌い回し',  rate: 'mid'  },
+      { en: 'whispering vocal',    jp: '囁き・ウィスパーボイス', rate: 'mid'  },
+      { en: 'layered vocal harmonies', jp: '綺麗な重なりハモり',  rate: 'high' },
+      { en: 'operatic choir',      jp: '壮大なオペラ風コーラス', rate: 'high' },
+      { en: 'piercing scream vocal',jp: '突き抜けるスクリーム',  rate: 'high' },
+      { en: 'vocaloid utaite style',     jp: '歌い手風（抜けが良くエッジのあるエモさ）', rate: 'high' },
+      { en: 'theatrical dynamic vocals', jp: 'がなり〜囁きまで演劇的な表現力', rate: 'high' }
+    ]
+  },
+  {
+    id: 'mood_production',
+    label: '🎛️ MOOD / PRODUCTION',
+    words: [
+      { en: 'intense raw energy',  jp: '生々しく激しい熱量',    rate: 'high' },
+      { en: 'dark melancholic',    jp: 'ダークで憂鬱な世界観',  rate: 'high' },
+      { en: 'epic cinematic ost',  jp: '映画サントラ風の壮大さ', rate: 'high' },
+      { en: 'nostalgic anime ost', jp: 'エモいアニソンサントラ風', rate: 'high' },
+      { en: 'high energy banger',  jp: 'ブチ上がるキラーチューン', rate: 'high' },
+      { en: 'glitchy',             jp: 'デジタルなノイズ・グリッチ', rate: 'mid'  },
+      { en: 'raw mixed lo-fi vibe', jp: 'あえて粗削りなスタジオ感', rate: 'mid'  },
+      { en: 'crystal clear production', jp: '音の分離が良い現代的音質', rate: 'high' },
+      { en: 'lo-fi cassette warmth',   jp: 'あえてザラつかせたローファイな質感', rate: 'mid'  },
+      { en: 'vintage vinyl crackle',   jp: 'レコードのプチプチ音（エモい空気感）', rate: 'high' },
+      { en: 'live studio session vibe', jp: 'バンドの一発録りのような生演奏感', rate: 'high' }
+    ]
+  },
+  {
+    id: 'tempo_structure',
+    label: '⏱️ TEMPO / BPM',
+    words: [
+      { en: 'fast tempo 180 bpm',  jp: '爆速 180 BPM',          rate: 'high' },
+      { en: 'driving 140 bpm',     jp: 'ノリやすい 140 BPM',     rate: 'high' },
+      { en: 'groovy 120 bpm',      jp: 'グルーヴの出る 120 BPM', rate: 'high' },
+      { en: 'slow moody 85 bpm',   jp: 'チル・バラード 85 BPM',  rate: 'high' },
+      { en: 'sudden tempo changes',jp: '曲中での突然のテンポ変化', rate: 'low'  },
+    ]
+  }
+];
+
+// =============================================
+//  おすすめセット データベース（爆量・ガチ強化版）
+// =============================================
+const PRESETS = [
+  // ── 🎸 国内ロック / バンド風 ──
+  {
+    title: 'ONE OK ROCK 風',
+    keywords: ['ワンオク', 'one ok rock', 'oor', 'エモロック', 'ラウド', 'スタジアム'],
+    artist: 'ONE OK ROCK',
+    words: ['alternative rock', 'powerful male vocal', 'high energy banger', 'driving 140 bpm', 'heavy chugging guitar']
+  },
+  {
+    title: 'X JAPAN 風',
+    keywords: ['エックス', 'x japan', 'v系', '速弾き', 'ツーバス', 'シンフォニック'],
+    artist: 'X JAPAN',
+    words: ['melodic speed metal', 'screaming guitar solo', 'operatic choir', 'fast tempo 180 bpm', 'powerful male vocal']
+  },
+  {
+    title: "B'z 風",
+    keywords: ['ビーズ', "b'z", 'bz', 'ハードロック', 'グラマラス', 'ギターソロ'],
+    artist: "B'z",
+    words: ['90s hard rock', 'screaming guitar solo', 'powerful male vocal', 'driving 140 bpm', 'intense raw energy']
+  },
+  {
+    title: "L'Arc~en~Ciel 風",
+    keywords: ['ラルク', 'larc', 'アンシエル', 'うねるベース', '耽美', '疾走'],
+    artist: "L'Arc~en~Ciel",
+    words: ['alternative rock', 'prominent walking bass', 'driving bassline', 'androgynous vocal', 'layered vocal harmonies']
+  },
+  {
+    title: 'GLAY 風',
+    keywords: ['グレイ', 'glay', '90年代ロック', 'ポップロック', '王道'],
+    artist: 'GLAY',
+    words: ['90s j-pop', 'alternative rock', 'clean arpeggio guitar', 'driving 140 bpm', 'powerful male vocal']
+  },
+  {
+    title: 'ASIAN KUNG-FU GENERATION 風',
+    keywords: ['アジカン', 'akg', 'アジアンカンフー', '下北沢', 'ギターロック'],
+    artist: 'ASIAN KUNG-FU GENERATION',
+    words: ['alternative rock', '90s grunge', 'driving bassline', 'intense raw energy', 'driving 140 bpm']
+  },
+  {
+    title: 'ELLEGARDEN 風',
+    keywords: ['エルレ', 'ellegarden', 'メロコア', 'パンク', '英語', '疾走感'],
+    artist: 'ELLEGARDEN',
+    words: ['pop punk', 'melodic hardcore vocals', 'driving bassline', 'fast tempo 180 bpm', 'intense raw energy']
+  },
+  {
+    title: 'King Gnu 風',
+    keywords: ['キングヌー', 'king gnu', 'ミクスチャー', 'お洒落', '拡声器'],
+    artist: 'King Gnu',
+    words: ['acid jazz', 'modern funk', 'distorted bass', 'androgynous vocal', 'groovy 120 bpm']
+  },
+  {
+    title: 'Official髭男dism 風',
+    keywords: ['ヒゲダン', '髭男', 'higedan', 'ピアノポップ', '高音'],
+    artist: 'Official髭男dism',
+    words: ['90s j-pop', 'modern funk', 'layered vocal harmonies', 'groovy 120 bpm', 'emotional female vocal']
+  },
+  {
+    title: 'Mrs. GREEN APPLE 風',
+    keywords: ['ミセス', 'mrs green apple', 'ハイトーン', '華やか', 'ポップ'],
+    artist: 'Mrs. GREEN APPLE',
+    words: ['j-rock', 'high energy banger', 'layered vocal harmonies', 'driving 140 bpm', 'crystal clear production']
+  },
+  {
+    title: 'THE BLUE HEARTS 風',
+    keywords: ['ブルーハーツ', 'パンク', 'ドブネズミ', '情熱', 'ストレート'],
+    artist: 'THE BLUE HEARTS',
+    words: ['pop punk', 'raw mixed lo-fi vibe', 'intense raw energy', 'driving 140 bpm', 'powerful male vocal']
+  },
+
+  // ── 🎹 ピアノ・歌姫バラード風 ──
+  {
+    title: 'Angela Aki 風',
+    keywords: ['アンジェラアキ', 'angela aki', '手紙', 'ピアノ弾き語り', '泣ける'],
+    artist: 'Angela Aki',
+    words: ['melancholic piano ballad', 'slow moody 85 bpm', 'emotional female vocal', 'crystal clear production']
+  },
+  {
+    title: '宇多田ヒカル 風',
+    keywords: ['宇多田', 'ヒカル', 'r&b', '切ない', 'ディープ', '先鋭的'],
+    artist: '宇多田ヒカル',
+    words: ['city pop', 'sub bass boost', 'whispering vocal', 'slow moody 85 bpm', 'layered vocal harmonies']
+  },
+  {
+    title: '椎名林檎 風',
+    keywords: ['椎名林檎', '林檎', '東京事変', 'ジャズロック', '妖艶', '歪み'],
+    artist: '椎名林檎',
+    words: ['acid jazz', 'distorted bass', 'husky raspy vocal', 'driving shuffle beat', 'math rock']
+  },
+  {
+    title: 'あいみょん 風',
+    keywords: ['あいみょん', 'アコギ', 'フォークロック', 'ノスタルジック'],
+    artist: 'あいみょん',
+    words: ['alternative rock', 'clean arpeggio guitar', 'husky raspy vocal', 'slow moody 85 bpm', 'raw mixed lo-fi vibe']
+  },
+
+  // ── ⚡ 最先端・ボカロ・アニソン系 ──
+  {
+    title: 'YOASOBI 風',
+    keywords: ['ヨアソビ', 'yoasobi', '夜に駆ける', '高速ポップ', 'ボカロ調'],
+    artist: 'YOASOBI',
+    words: ['vocaloid style', 'j-rock', 'fast tempo 180 bpm', 'emotional female vocal', 'crystal clear production']
+  },
+  {
+    title: 'ずっと真夜中でいいのに。風',
+    keywords: ['ずとまよ', 'ztmy', '変則的', 'ベース暴れ', 'テクニカル'],
+    artist: 'ずっと真夜中でいいのに。',
+    words: ['math rock', 'slap bass aggressive', 'vocaloid style', 'technical drumming', 'groovy 120 bpm']
+  },
+  {
+    title: '米津玄師 風',
+    keywords: ['米津', 'よねづ', 'ハチ', '独創的', 'ダークポップ'],
+    artist: '米津玄師',
+    words: ['alternative rock', 'dark melancholic', 'groovy synth bass', 'raw mixed lo-fi vibe', 'driving 140 bpm']
+  },
+  {
+    title: 'LiSA 風 / 王道アニソン主題歌',
+    keywords: ['lisa', 'リサ', '鬼滅', '熱い', 'アニソン', 'タイアップ'],
+    artist: 'LiSA',
+    words: ['j-rock', 'nostalgic anime ost', 'screaming guitar solo', 'driving 140 bpm', 'powerful male vocal']
+  },
+
+  // ── 🎸 スラップ・重低音ベース特化系 ──
+  {
+    title: 'バキバキ爆音スラップ（ファンク）',
+    keywords: ['スラップ', 'ベース目立つ', 'ファンキー', 'チョッパー', 'グルーヴ'],
+    artist: 'Bass Slap Special',
+    words: ['funk slap bassline', 'slap bass aggressive', 'modern funk', 'funky muted guitar strum', 'groovy 120 bpm']
+  },
+  {
+    title: 'ジャズ風ウォーキングベース',
+    keywords: ['ウォーキングベース', 'ジャズ', 'ウッドベース', '大人', 'バー', 'ランニング'],
+    artist: 'Jazz Walking Bass',
+    words: ['prominent walking bass', 'jazz fusion', 'acid jazz', 'slow moody 85 bpm', 'driving shuffle beat']
+  },
+  {
+    title: '歪み重低音（ラウド・メタル用）',
+    keywords: ['歪みベース', 'ゴリゴリ', '重低音', 'ダウンチューニング', 'ドコドコ'],
+    artist: 'Distorted Heavy Bass',
+    words: ['distorted bass', 'heavy picked bass', 'metalcore', 'heavy chugging guitar', 'fast double bass drum']
+  },
+
+  // ── 🌎 洋楽レジェンド・世界観系 ──
+  {
+    title: 'Red Hot Chili Peppers 風',
+    keywords: ['レッチリ', 'rhcp', 'ミクスチャー', 'ファンクロック'],
+    artist: 'Red Hot Chili Peppers',
+    words: ['alternative rock', 'slap bass aggressive', 'funky muted guitar strum', 'groovy 120 bpm', 'powerful male vocal']
+  },
+  {
+    title: 'Metallica 風',
+    keywords: ['メタリカ', 'metallica', 'スラッシュメタル', 'ザクザク'],
+    artist: 'Metallica',
+    words: ['modern heavy metal', 'heavy chugging guitar', 'fast double bass drum', 'intense raw energy', 'powerful male vocal']
+  },
+  {
+    title: 'Billie Eilish 風',
+    keywords: ['ビリーアイリッシュ', 'ビリー', 'ウィスパー', '極太サブベース'],
+    artist: 'Billie Eilish',
+    words: ['dark melancholic', 'whispering vocal', 'sub bass boost', 'slow moody 85 bpm', 'raw mixed lo-fi vibe']
+  },
+  {
+    title: 'Nirvana 風',
+    keywords: ['ニルヴァーナ', 'カートコバーン', 'グランジ', '退廃的'],
+    artist: 'Nirvana',
+    words: ['90s grunge', 'raw mixed lo-fi vibe', 'husky raspy vocal', 'heavy picked bass', 'intense raw energy']
+  },
+
+  // ── 🌌 エモ・シチュエーション・ムード系 ──
+  {
+    title: '寂しげなバラード（切ないピアノ）',
+    keywords: ['寂しい', '寂しげ', 'バラード', '悲しい', '切ない', '孤独', '泣ける', 'しっとり'],
+    artist: 'Mood: Melancholic',
+    words: ['dark melancholic', 'slow moody 85 bpm', 'emotional female vocal', 'clean arpeggio guitar']
+  },
+  {
+    title: '激しいロック・怒りの咆哮',
+    keywords: ['激しい', 'ロック', '怒り', '叫び', '咆哮', '攻撃的', 'パワフル'],
+    artist: 'Mood: Aggressive',
+    words: ['modern heavy metal', 'intense raw energy', 'fast tempo 180 bpm', 'heavy chugging guitar', 'piercing scream vocal']
+  },
+  {
+    title: '真夜中のドライブ（都会的）',
+    keywords: ['ドライブ', '夜', '都会', '洗練', '首都高', 'ネオン'],
+    artist: 'Mood: Night Drive',
+    words: ['city pop', 'acid jazz', 'groovy synth bass', 'groovy 120 bpm', 'layered vocal harmonies']
+  },
+  {
+    title: '爽快！青空駆け抜ける青春',
+    keywords: ['爽快', '青空', '青春', '疾走', '明るい', '元気', '夏'],
+    artist: 'Mood: Youthful',
+    words: ['pop punk', 'driving 140 bpm', 'emotional female vocal', 'driving bassline', 'crystal clear production']
+  },
+  {
+    title: '絶望と退廃の世界観',
+    keywords: ['絶望', '退廃', 'ゴシック', '暗い', '闇', 'ディストピア'],
+    artist: 'Mood: Dystopian',
+    words: ['post-hardcore', 'dark melancholic', 'distorted bass', 'husky raspy vocal', 'slow moody 85 bpm']
+  },
+  {
+    title: '近未来サイバーパンク',
+    keywords: ['サイバー', '未来', 'sf', '電脳', 'デジタル', 'ネオ東京'],
+    artist: 'Mood: Cyberpunk',
+    words: ['cyberpunk synthwave', 'groovy synth bass', 'glitchy', 'crystal clear production', 'fast tempo 180 bpm']
+  },
+  {
+    title: 'お洒落な深夜のジャズカフェ',
+    keywords: ['お洒落', 'おしゃれ', 'カフェ', 'バー', '深夜', 'ジャズ', '煙たい'],
+    artist: 'Mood: Jazz Cafe',
+    words: ['acid jazz', 'prominent walking bass', 'fretless bass groove', 'slow moody 85 bpm', 'whispering vocal']
+  },
+  {
+    title: '超爆速メロスピ（脳汁全開）',
+    keywords: ['メロスピ', 'スピードメタル', '爆速', 'ツーバス', 'ピロピロ'],
+    artist: 'Mood: Speed Star',
+    words: ['melodic speed metal', 'fast tempo 180 bpm', 'blast beat', 'fast double bass drum', 'screaming guitar solo']
+  },
+
+  // ── ⚡ ボカロ・ラウド・J-ROCK ──
+  {
+    title: 'ゆよゆっぺ / ボカロメタル風',
+    keywords: ['ボカロメタル', 'ゆよゆっぺ', 'うじてぃ', 'ボカロック', '激しいボカロ'],
+    artist: 'Vocaloid Metal Style',
+    words: ['electro metalcore', 'distorted bass', 'vocaloid inflection', 'fast tempo 180 bpm', 'piercing scream vocal']
+  },
+  {
+    title: 'マキシマム ザ ホルモン 風',
+    keywords: ['ホルモン', 'マキシマムザホルモン', 'ミクスチャー', 'デスボ', 'ファンクベース'],
+    artist: 'Maximum The Hormone Style',
+    words: ['nu-metal', 'slap aggressive bass', 'heavy chugging guitar', 'blast beat', 'piercing scream vocal']
+  },
+  {
+    title: '和楽器・和風モダンロック',
+    keywords: ['和風', '和楽器', 'ボカロ和風', '千本桜', '和ロック', '三味線', '尺八'],
+    artist: 'Traditional Japanese Rock',
+    words: ['j-rock', 'shakuhachi shamisen', 'fast tempo 180 bpm', 'emotional female vocal', 'intense raw energy']
+  },
+  {
+    title: '眩暈SIREN / 退廃的エモロック',
+    keywords: ['眩暈SIREN', 'めまい', '鬱ロック', '切ないロック', 'ピアノロック', '疾走'],
+    artist: 'Memai Siren Style',
+    words: ['post-hardcore', 'dark melancholic', 'melancholic piano ballad', 'driving bassline', 'driving 140 bpm']
+  },
+
+  // ── 🎷 お洒落・ジャズ・ロック融合系 ──
+  {
+    title: '東京事変 風',
+    keywords: ['東京事変', '椎名林檎', '事変', 'ジャズロック', 'お洒落ロック'],
+    artist: 'Tokyo Jihen Style',
+    words: ['math rock', 'acid jazz', 'slap bass aggressive', 'husky raspy vocal', 'driving shuffle beat']
+  },
+  {
+    title: 'CASIOPEA 風（フュージョン）',
+    keywords: ['カシオペア', 'casiopea', 'フュージョン', 'インスト', 'インストゥルメンタル', 'テクニカル'],
+    artist: 'Japanese Jazz Fusion',
+    words: ['japanese jazz fusion', 'prominent walking bass', 'technical drumming', 'groovy 120 bpm', 'instrumental']
+  },
+  {
+    title: 'UNISON SQUARE GARDEN 風',
+    keywords: ['ユニゾン', 'usg', 'シュガーソング', 'ベース暴れ', '高速ロック'],
+    artist: 'UNISON SQUARE GARDEN Style',
+    words: ['j-rock', 'pop punk', 'driving bassline', 'fast tempo 180 bpm', 'high energy banger']
+  },
+  {
+    title: 'J-REGGAE / ロック・ジャズ融合',
+    keywords: ['レゲエ', '裏打ち', 'ゆるい', 'お洒落', 'サマー'],
+    artist: 'J-Reggae Rock Vibe',
+    words: ['groovy 120 bpm', 'fretless bass groove', 'funky muted guitar strum', 'driving shuffle beat']
+  },
+
+  // ── 🦋 ダーク・ラウド・ヨルシカ系 ──
+  {
+    title: 'ヨルシカ 風',
+    keywords: ['ヨルシカ', 'yorushika', 'ナブナ', '切ない', '文学的', 'ピアノロック'],
+    artist: 'Yorushika Style',
+    words: ['j-rock', 'clean arpeggio guitar', 'driving bassline', 'emotional female vocal', 'driving 140 bpm']
+  },
+  {
+    title: 'SiM 風（レゲエパンク）',
+    keywords: ['sim', 'シム', 'レゲエパンク', 'ラウドロック', '悪魔', '重低音'],
+    artist: 'SiM Style',
+    words: ['metalcore', 'driving shuffle beat', 'distorted bass', 'heavy chugging guitar', 'piercing scream vocal']
+  },
+  {
+    title: 'Avenged Sevenfold 風',
+    keywords: ['a7x', 'アヴェンジド', 'セヴンフォールド', 'メタルコア', 'ツインギター', 'クラシカル'],
+    artist: 'Avenged Sevenfold Style',
+    words: ['modern heavy metal', 'screaming guitar solo', 'fast double bass drum', 'heavy picked bass', 'operatic choir']
+  },
+  {
+    title: 'ファントムシータ 風（レトロホラー）',
+    keywords: ['ファントムシータ', 'おともだち', 'ホラー', 'レトロ', 'ダークポップ', '狂気'],
+    artist: 'Phantom Siita Style',
+    words: ['dark melancholic', 'vocaloid style', 'groovy synth bass', 'husky raspy vocal', 'glitchy']
+  },
+  {
+    title: 'Ado 風（圧倒的表現力）',
+    keywords: ['ado', 'アド', 'うっせぇわ', '歌い手', 'がなり', '劇的'],
+    artist: 'Ado Style',
+    words: ['j-rock', 'high energy banger', 'piercing scream vocal', 'distorted bass', 'layered vocal harmonies']
+  }
+];
+
+// =============================================
+//  検索モード管理
+// =============================================
+let searchMode = 'word'; // 'word' | 'image'
+
+function setSearchMode(mode) {
+  searchMode = mode;
+  document.getElementById('modeWordBtn').classList.toggle('active', mode === 'word');
+  document.getElementById('modeImageBtn').classList.toggle('active', mode === 'image');
+
+  const input = document.getElementById('searchInput');
+  if (mode === 'word') {
+    input.placeholder = 'キーワードで検索（例：bass、dark、female...）';
+  } else {
+    input.placeholder = 'イメージやアーティスト名で検索（例：激しいロック、YOASOBI風...）';
+  }
+
+  input.value = '';
+  searchQuery = '';
+  renderWords();
+  renderSuggests([]);
+}
+
+function onSearchInput() {
+  const raw = document.getElementById('searchInput').value;
+  const q = raw.toLowerCase().trim();
+  searchQuery = q;
+
+  if (searchMode === 'image') {
+    const matched = matchPresets(raw.trim());
+    renderSuggests(matched);
+    // イメージ検索モード中は単語グリッドを非表示
+    document.getElementById('tabs').style.display = 'none';
+    document.getElementById('wordsGrid').style.display = q ? 'none' : 'grid';
+  } else {
+    document.getElementById('tabs').style.display = 'flex';
+    document.getElementById('wordsGrid').style.display = 'grid';
+    renderWords();
+    renderSuggests([]);
+  }
+}
+
+// キーワードマッチング
+function matchPresets(query) {
+  if (!query) return [];
+  const q = query.toLowerCase();
+  const scored = PRESETS.map(p => {
+    let score = 0;
+    p.keywords.forEach(kw => {
+      if (q.includes(kw.toLowerCase()) || kw.toLowerCase().includes(q)) score += 2;
+    });
+    if (p.artist && q.includes(p.artist.toLowerCase())) score += 5;
+    if (p.title.toLowerCase().includes(q)) score += 3;
+    return { ...p, score };
+  }).filter(p => p.score > 0);
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, 6);
+}
+
+// おすすめセット描画
+function renderSuggests(presets) {
+  const scroll = document.getElementById('suggestScroll');
+  if (presets.length === 0) {
+    const isImageMode = searchMode === 'image';
+    scroll.innerHTML = `<div class="suggest-none">${
+      isImageMode
+        ? 'イメージやアーティスト名を入力するとセットが表示されます'
+        : '下の検索ボックスで日本語のイメージやアーティスト名を入力してください'
+    }</div>`;
+    return;
+  }
+
+  scroll.innerHTML = presets.map((p, i) => {
+    const tagsHtml = p.words.map(w =>
+      `<span class="suggest-tag">${w}</span>`
+    ).join('');
+    const totalLen = p.words.join(', ').length;
+    const safeTitle = p.title.replace(/'/g, "\\'");
+    return `
+      <div class="suggest-card" id="scard-${i}">
+        <div class="suggest-title">${p.title}</div>
+        ${p.artist ? `<div class="suggest-artist">🎤 ${p.artist}</div>` : ''}
+        <div class="suggest-tags">${tagsHtml}</div>
+        <button class="suggest-apply-btn" onclick="applyPreset(${i}, ${JSON.stringify(p.words)})">
+          ▸ このセットを適用 (${totalLen}文字)
+        </button>
+      </div>
+    `;
+  }).join('');
+}
+
+// セット適用
+function applyPreset(idx, words) {
+  let added = 0;
+  words.forEach(w => {
+    if (!selected.has(w)) {
+      const current = [...selected, w].join(', ');
+      if (current.length <= 200) {
+        selected.add(w);
+        added++;
+      }
+    }
+  });
+  updateOutput();
+  renderWords();
+  renderTags();
+  showToast(added > 0 ? `✓ ${added}個の単語を追加しました！` : '⚠ すでに追加済みか文字数制限に達しています');
+}
+
+
+
+// =============================================
+//  状態管理
+// =============================================
+let selected = new Set();
+let activeTab = CATEGORIES[0].id;
+let searchQuery = '';
+function renderTabs() {
+  const tabsEl = document.getElementById('tabs');
+  tabsEl.innerHTML = CATEGORIES.map(cat => `
+    <button class="tab ${cat.id === activeTab ? 'active' : ''}"
+      onclick="switchTab('${cat.id}')">
+      ${cat.label}
+    </button>
+  `).join('');
+}
+
+function switchTab(id) {
+  activeTab = id;
+  searchQuery = '';
+  document.getElementById('searchInput').value = '';
+  renderTabs();
+  renderWords();
+}
+
+// =============================================
+//  単語グリッド描画
+// =============================================
+function renderWords() {
+  const grid = document.getElementById('wordsGrid');
+  let words = [];
+
+  if (searchQuery) {
+    // 全カテゴリから検索
+    CATEGORIES.forEach(cat => {
+      cat.words.forEach(w => {
+        if (
+          w.en.toLowerCase().includes(searchQuery) ||
+          w.jp.includes(searchQuery)
+        ) words.push(w);
+      });
+    });
+    // 重複排除
+    const seen = new Set();
+    words = words.filter(w => {
+      if (seen.has(w.en)) return false;
+      seen.add(w.en);
+      return true;
+    });
+  } else {
+    const cat = CATEGORIES.find(c => c.id === activeTab);
+    words = cat ? cat.words : [];
+  }
+
+  if (words.length === 0) {
+    grid.innerHTML = '<div class="no-results">「' + searchQuery + '」の検索結果なし</div>';
+    return;
+  }
+
+  grid.innerHTML = words.map(w => {
+    const isSel = selected.has(w.en);
+    const rateLabel = { high: 'HIGH', mid: 'MID', low: 'LOW' }[w.rate];
+    return `
+      <button class="word-btn ${isSel ? 'selected' : ''}"
+        onclick="toggleWord('${w.en.replace(/'/g,"\\'")}')">
+        <span class="word-name">${w.en}</span>
+        <span class="word-jp">${w.jp}</span>
+        <span class="rate-badge rate-${w.rate}">
+          <span class="rate-dot"></span>${rateLabel}
+        </span>
+      </button>
+    `;
+  }).join('');
+}
+
+// =============================================
+//  単語トグル
+// =============================================
+function toggleWord(en) {
+  if (selected.has(en)) {
+    selected.delete(en);
+  } else {
+    const current = [...selected].join(', ');
+    const next = current ? current + ', ' + en : en;
+    if (next.length > 200) {
+      showToast('⚠ 200文字を超えます！');
+      return;
+    }
+    selected.add(en);
+  }
+  updateOutput();
+  renderWords();
+  renderTags();
+}
+
+// =============================================
+//  出力更新
+// =============================================
+function updateOutput() {
+  const outputEl = document.getElementById('outputText');
+  const prompt = [...selected].join(', ');
+
+  if (prompt === '') {
+    outputEl.textContent = '単語をタップして選んでください...';
+    outputEl.classList.add('empty');
+  } else {
+    outputEl.textContent = prompt;
+    outputEl.classList.remove('empty');
+  }
+
+  // 文字数バー
+  const len = prompt.length;
+  const pct = Math.min((len / 200) * 100, 100);
+  const fill = document.getElementById('charBarFill');
+  const count = document.getElementById('charCount');
+
+  fill.style.width = pct + '%';
+  fill.className = 'char-bar-fill' + (len > 180 ? ' over' : len > 150 ? ' warn' : '');
+  count.textContent = len + ' / 200';
+  count.className = 'char-count' + (len > 180 ? ' over' : len > 150 ? ' warn' : '');
+
+  // コピーボタン
+  const btn = document.getElementById('copyBtn');
+  btn.disabled = (prompt === '');
+}
+
+// =============================================
+//  タグ描画
+// =============================================
+function renderTags() {
+  const wrap = document.getElementById('tagsWrap');
+  const empty = document.getElementById('tagsEmpty');
+  const countEl = document.getElementById('selectedCount');
+
+  countEl.textContent = selected.size;
+
+  if (selected.size === 0) {
+    wrap.innerHTML = '<span class="tags-empty" id="tagsEmpty">まだ何も選択されていません</span>';
+    return;
+  }
+
+  wrap.innerHTML = [...selected].map(en => `
+    <span class="tag">
+      ${en}
+      <button class="tag-remove" onclick="removeTag('${en.replace(/'/g,"\\'")}')">×</button>
+    </span>
+  `).join('');
+}
+
+function removeTag(en) {
+  selected.delete(en);
+  updateOutput();
+  renderWords();
+  renderTags();
+}
+
+function clearAll() {
+  if (selected.size === 0) return;
+  selected.clear();
+  updateOutput();
+  renderWords();
+  renderTags();
+}
+
+// =============================================
+//  検索フィルタ（単語検索モード用）
+// =============================================
+function filterWords() {
+  searchQuery = document.getElementById('searchInput').value.toLowerCase().trim();
+  renderWords();
+}
+
+// =============================================
+//  コピー
+// =============================================
+function copyPrompt() {
+  const prompt = [...selected].join(', ');
+  if (!prompt) return;
+
+  navigator.clipboard.writeText(prompt).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.classList.add('copied');
+    btn.textContent = '✓ コピー完了！';
+    showToast('✓ クリップボードにコピーしました！');
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      btn.textContent = '📋 ワンタップでコピー';
+    }, 2000);
+  }).catch(() => {
+    // フォールバック
+    const ta = document.createElement('textarea');
+    ta.value = prompt;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('✓ コピーしました！');
+  });
+}
+
+// =============================================
+//  トースト
+// =============================================
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// =============================================
+//  初期化
+// =============================================
+renderTabs();
+renderWords();
+renderTags();
+updateOutput();
+renderSuggests([]);
+</script>
+</body>
+</html>
